@@ -336,3 +336,21 @@ def test_print_value():
                          ])
 def test_metric_value_is_better(new, old, metric, result):
     assert utils.metric_value_is_better(new, old, metric) == result
+
+
+def test_topk_func():
+    batch_size = 5
+    beam_size = 5
+    target_vocab_size = 10
+    offset = np.repeat(np.arange(0, batch_size * beam_size, beam_size), beam_size)
+    #(batch_size * beam_size, target_vocab_size)
+    scores = mx.nd.random.uniform(0, 1, (batch_size * beam_size, target_vocab_size))
+    #print("SCORES ", scores)
+    e1,e2,e3 = utils.topk(scores, k=beam_size, batch_size=batch_size, offset=offset, use_mxnet_topk=False)
+    r1,r2,r3 = utils.topk(scores, k=beam_size, batch_size=batch_size, offset=mx.nd.array(offset, dtype='int32'), use_mxnet_topk=True)
+    print(r3)
+    print(e3)
+    assert all(r1.asnumpy() == e1)
+    assert all(r2.asnumpy() == e2)
+    assert r3.shape == e3.shape
+    assert all(r3.asnumpy() == e3)

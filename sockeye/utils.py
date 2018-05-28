@@ -272,8 +272,8 @@ def topk(scores: mx.nd.NDArray,
     if use_mxnet_topk:
         # pylint: disable=unbalanced-tuple-unpacking
         values, indices = mx.nd.topk(folded_scores, axis=1, k=k, ret_typ='both', is_ascend=True)
-        best_hyp_indices, best_word_indices = np.unravel_index(indices.astype(np.int32).asnumpy().ravel(), scores.shape)
-        values = values.reshape((-1,))
+        best_hyp_indices, best_word_indices = mx.nd.unravel_index(mx.nd.cast(indices, 'int32').reshape((-1,)), scores.shape)
+        values = values.reshape((-1, 1))
     else:
         folded_scores = folded_scores.asnumpy()
         # Get the scores
@@ -281,7 +281,8 @@ def topk(scores: mx.nd.NDArray,
         flat_idxs = np.argpartition(folded_scores, range(k))[:, :k]
         # Score values: (batch_size, beam_size)
         values = folded_scores[np.arange(folded_scores.shape[0])[:, None], flat_idxs].ravel()
-        best_hyp_indices, best_word_indices = np.unravel_index(flat_idxs.ravel(), scores.shape)
+        result = np.unravel_index(flat_idxs.ravel(), scores.shape)
+        best_hyp_indices, best_word_indices = result
 
     if batch_size > 1:
         # Offsetting the indices to match the shape of the scores matrix

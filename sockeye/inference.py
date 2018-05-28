@@ -998,13 +998,14 @@ class Translator:
         self.inf_array = mx.nd.slice(self.inf_array_long, begin=(0,), end=(self.beam_size,))
 
         # offset for hypothesis indices in batch decoding
-        self.offset = np.repeat(np.arange(0, self.batch_size * self.beam_size, self.beam_size), self.beam_size)
+        self.offset = mx.nd.array(np.repeat(np.arange(0, self.batch_size * self.beam_size, self.beam_size), self.beam_size),
+                                  dtype='int32', ctx=self.context)
         # topk function used in beam search
         self.topk = partial(utils.topk,
                             k=self.beam_size,
                             batch_size=self.batch_size,
                             offset=self.offset,
-                            use_mxnet_topk=self.context != mx.cpu())  # MXNet implementation is faster on GPUs
+                            use_mxnet_topk=True)  # MXNet implementation is faster on GPUs
 
         logger.info("Translator (%d model(s) beam_size=%d beam_prune=%s beam_search_stop=%s "
                     "ensemble_mode=%s batch_size=%d buckets_source=%s)",
@@ -1472,7 +1473,7 @@ class Translator:
 
             # (3) Get beam_size winning hypotheses for each sentence block separately. Only look as
             # far as the active beam size for each sentence.
-            best_hyp_indices[:], best_word_indices[:], scores_accumulated[:, 0] = self.topk(scores)
+            best_hyp_indices, best_word_indices, scores_accumulated = self.topk(scores)
 
             # Constraints for constrained decoding are processed sentence by sentence
             if any(raw_constraint_list):
@@ -1565,9 +1566,8 @@ class Translator:
         # (9) Sort the hypotheses within each sentence (normalization for finished hyps may have unsorted them).
         folded_accumulated_scores = scores_accumulated.reshape(
             (self.batch_size, self.beam_size * scores_accumulated.shape[-1]))
-        indices = mx.nd.argsort(folded_accumulated_scores, axis=1)
-        best_hyp_indices[:], _ = np.unravel_index(indices.astype(np.int32).asnumpy().ravel(),
-                                                  scores_accumulated.shape) + self.offset
+        indices = mx.nd.cast(mx.nd.argsort(folded_accumulated_scores, axis=1), dtype='int32').reshape((-1,))
+        best_hyp_indices, _ = mx.nd.unravel_index(indices, scores_accumulated.shape) + self.offset
         # Now reorder the arrays
         sequences = sequences.take(best_hyp_indices)
         lengths = lengths.take(best_hyp_indices)
