@@ -338,19 +338,24 @@ def test_metric_value_is_better(new, old, metric, result):
     assert utils.metric_value_is_better(new, old, metric) == result
 
 
-def test_topk_func():
-    batch_size = 5
-    beam_size = 5
-    target_vocab_size = 10
-    offset = np.repeat(np.arange(0, batch_size * beam_size, beam_size), beam_size)
-    #(batch_size * beam_size, target_vocab_size)
+@pytest.mark.parametrize("batch_size, beam_size, target_vocab_size",
+                        [(1, 5, 200),
+                         (5, 5, 200),
+                         (1, 1, 200),
+                         (5, 1, 200),
+                         (10, 10, 100)])
+def test_topk_func(batch_size, beam_size, target_vocab_size):
+    # Random model scores. Shape: (batch_size * beam_size, target_vocab_size)
     scores = mx.nd.random.uniform(0, 1, (batch_size * beam_size, target_vocab_size))
-    #print("SCORES ", scores)
-    e1,e2,e3 = utils.topk(scores, k=beam_size, batch_size=batch_size, offset=offset, use_mxnet_topk=False)
-    r1,r2,r3 = utils.topk(scores, k=beam_size, batch_size=batch_size, offset=mx.nd.array(offset, dtype='int32'), use_mxnet_topk=True)
-    print(r3)
-    print(e3)
-    assert all(r1.asnumpy() == e1)
-    assert all(r2.asnumpy() == e2)
-    assert r3.shape == e3.shape
-    assert all(r3.asnumpy() == e3)
+    # offset for batch sizes > 1
+    offset_np = np.repeat(np.arange(0, batch_size * beam_size, beam_size), beam_size)
+    offset_mx = mx.nd.array(offset_np, dtype='int32')
+
+    np_hyp, np_word, np_values = utils.topk(scores, k=beam_size, batch_size=batch_size,
+                                            offset=offset_np, use_mxnet_topk=False)
+
+    mx_hyp, mx_word, mx_values = utils.topk(scores, k=beam_size, batch_size=batch_size,
+                                            offset=offset_mx, use_mxnet_topk=True)
+    assert all(mx_hyp.asnumpy() == np_hyp)
+    assert all(mx_word.asnumpy() == np_word)
+    assert all(mx_values.asnumpy() == np_values)
