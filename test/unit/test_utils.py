@@ -359,3 +359,17 @@ def test_topk_func(batch_size, beam_size, target_vocab_size):
     assert all(mx_hyp.asnumpy() == np_hyp)
     assert all(mx_word.asnumpy() == np_word)
     assert all(mx_values.asnumpy() == np_values)
+
+    topk = utils.Topk(k=beam_size, batch_size=batch_size, vocab_size=target_vocab_size)
+
+    mx_hyp, mx_word, mx_values = topk(scores, offset_mx)
+    assert all(mx_hyp.asnumpy() == np_hyp)
+    assert all(mx_word.asnumpy() == np_word)
+    assert all(mx_values.asnumpy() == np_values)
+
+    topk.hybridize()
+    mx_hyp, mx_word, mx_values = topk(scores, offset_mx)
+    print(mx_hyp, mx_word, mx_values)
+    assert all(mx_hyp.asnumpy() == np_hyp)
+    assert all(mx_word.asnumpy() == np_word)
+    assert all(mx_values.asnumpy() == np_values)

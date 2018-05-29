@@ -292,6 +292,25 @@ def topk(scores: mx.nd.NDArray,
     return best_hyp_indices, best_word_indices, values
 
 
+class Topk(mx.gluon.HybridBlock):
+
+    def __init__(self, k, batch_size, vocab_size):
+        super().__init__()
+        self.k = k
+        self.batch_size = batch_size
+        self.vocab_size = vocab_size
+
+    def hybrid_forward(self, F, scores, offset):
+        folded_scores = F.reshape(scores, shape=(self.batch_size, -1))
+        values, indices = F.topk(folded_scores, axis=1, k=self.k, ret_typ='both', is_ascend=True)
+        indices = F.reshape(F.cast(indices, 'int32'), shape=(-1,))
+        unraveled = F.unravel_index(indices, shape=(self.batch_size * self.k, self.vocab_size))
+        best_hyp_indices, best_word_indices = F.split(unraveled, axis=0, num_outputs=2, squeeze_axis=True)
+        best_hyp_indices = best_hyp_indices + offset
+        values = F.reshape(values, shape=(-1, 1))
+        return best_hyp_indices, best_word_indices, values
+
+
 def chunks(some_list: List, n: int) -> Iterable[List]:
     """Yield successive n-sized chunks from l."""
     for i in range(0, len(some_list), n):
